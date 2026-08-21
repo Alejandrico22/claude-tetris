@@ -25,6 +25,7 @@ Implementación del clásico **Tetris** en JavaScript vanilla, usando HTML5 Canv
   - [Tecnologías](#tecnologías)
   - [Estructura del proyecto](#estructura-del-proyecto)
   - [Personalización](#personalización)
+  - [Triage automático de issues](#triage-automático-de-issues)
   - [Licencia](#licencia)
 
 ---
@@ -178,6 +179,20 @@ Algunos parámetros fáciles de tunear en `game.js`:
 | `dropInterval` | Velocidad inicial de caída en ms         | `1000`                |
 
 > Si cambias `COLS`, `ROWS` o `BLOCK`, recuerda ajustar también `width` y `height` del `<canvas id="board">` en `index.html` para que coincida (`COLS × BLOCK` × `ROWS × BLOCK`).
+
+---
+
+## Triage automático de issues
+
+El repositorio incluye un workflow de GitHub Actions (`.github/workflows/claude-issue-triage.yml`) que analiza automáticamente cada issue con Claude al **crearse** o **editarse**.
+
+Para cada issue, Claude:
+
+1. Lee `CLAUDE.md` y `game.js` para identificar qué parte del juego está implicada (colisiones, rotación, limpieza de líneas, ghost piece, game loop, etc.).
+2. Le asigna exactamente un label de prioridad (`priority:critical` / `high` / `medium` / `low`) y uno de complejidad (`complexity:trivial` / `small` / `medium` / `large`), reemplazando los que hubiera de análisis anteriores.
+3. Publica (o actualiza) un comentario de diagnóstico con resumen, clasificación justificada, componentes/funciones afectadas, análisis de la causa, un enfoque de solución propuesto, criterios de aceptación y riesgos a tener en cuenta.
+
+El objetivo es que ese diagnóstico sirva como punto de partida directo para implementar la solución, sin que Claude llegue a tocar código ni abrir pull requests — el workflow solo diagnostica y etiqueta.
 
 ---
 

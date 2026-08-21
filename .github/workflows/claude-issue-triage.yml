@@ -1,0 +1,111 @@
+name: Issue Triage
+on:
+  issues:
+    types: [opened, edited]
+
+concurrency:
+  group: issue-triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Asegurar labels de prioridad/complejidad
+        run: |
+          gh label create "priority:critical" --color b60205 --description "Rompe el juego o lo hace injugable" --force
+          gh label create "priority:high" --color d93f0b --description "Afecta seriamente la jugabilidad" --force
+          gh label create "priority:medium" --color fbca04 --description "Molesto pero con workaround" --force
+          gh label create "priority:low" --color 0e8a16 --description "Cosmético o mejora menor" --force
+          gh label create "complexity:trivial" --color c2e0c6 --description "Pocas líneas, una función" --force
+          gh label create "complexity:small" --color bfd4f2 --description "Una función o constante en game.js" --force
+          gh label create "complexity:medium" --color 5319e7 --description "Varias funciones o cambios en index.html/style.css" --force
+          gh label create "complexity:large" --color 1d76db --description "Refactor estructural o cambio del modelo del tablero" --force
+        env:
+          GH_REPO: ${{ github.repository }}
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE NUMBER: ${{ github.event.issue.number }}
+            TITLE: ${{ github.event.issue.title }}
+            AUTHOR: ${{ github.event.issue.user.login }}
+            BODY:
+            ${{ github.event.issue.body }}
+
+            Eres el encargado de triage técnico de issues de este repositorio, un clon de
+            Tetris en HTML5 Canvas + JavaScript vanilla (ver CLAUDE.md para la arquitectura
+            completa). Tu diagnóstico será usado directamente por otra persona para escribir
+            el código de la solución, así que sé concreto y cita archivos/funciones reales.
+
+            No modifiques código ni abras pull requests. No edites el cuerpo del issue (eso
+            volvería a disparar este mismo workflow). Escribe siempre en español.
+
+            Pasos:
+
+            1. Lee CLAUDE.md y game.js (usa Read/Glob/Grep) para entender qué componente del
+               juego está implicado: modelo del tablero, piezas/rotación (rotateCW,
+               tryRotate), colisión (collide), bloqueo y spawn (lockPiece, merge, spawn),
+               limpieza de líneas (clearLines), mecánicas de caída (softDrop, hardDrop,
+               dropInterval), ghost piece (ghostY), el loop principal (loop, draw), input
+               (keydown), o estado de pausa/game over.
+
+            2. Si el issue no da información suficiente para diagnosticar con confianza,
+               dilo explícitamente en el comentario y pide los datos concretos que faltan
+               (pasos para reproducir, navegador, captura, etc.) en vez de inventar una causa.
+
+            3. Clasifica el issue con exactamente un label de cada familia:
+               - priority: priority:critical / priority:high / priority:medium / priority:low
+               - complexity: complexity:trivial / complexity:small / complexity:medium / complexity:large
+               Consulta los labels actuales del issue con `gh issue view` y quita cualquier
+               label de esas dos familias que ya tuviera antes de añadir los nuevos, en una
+               sola llamada, por ejemplo:
+               `gh issue edit ${{ github.event.issue.number }} --add-label "priority:high" --remove-label "priority:low" --add-label "complexity:small"`
+               (omite --remove-label si el issue no tenía label previo de esa familia).
+
+            4. Redacta el diagnóstico en un archivo temporal y publícalo con:
+               `gh issue comment ${{ github.event.issue.number }} --body-file <archivo> --edit-last --create-if-none`
+               (--edit-last actualiza tu propio comentario anterior si ya existe, en vez de
+               acumular comentarios nuevos en cada edición del issue).
+
+               El comentario debe empezar con `<!-- claude-triage -->` y seguir esta
+               estructura exacta:
+
+               ## Resumen
+               (el problema en 1-2 frases)
+
+               ## Clasificación
+               - Prioridad: `priority:x` — justificación en una línea
+               - Complejidad: `complexity:x` — justificación en una línea
+
+               ## Componentes afectados
+               (rutas y funciones concretas, ej. `game.js` → `clearLines()`)
+
+               ## Análisis
+               (causa probable; comportamiento esperado vs. actual)
+
+               ## Enfoque propuesto
+               (pasos numerados de implementación)
+
+               ## Criterios de aceptación
+               (cómo verificar manualmente en el navegador — no hay tooling de test en este repo)
+
+               ## Riesgos
+               (efectos colaterales; p. ej. COLS/ROWS/BLOCK deben mantenerse en sync con el
+               tamaño del canvas en index.html, o PIECES/COLORS deben permanecer index-aligned)
+          claude_args: |
+            --max-turns 20
+            --allowedTools "Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh label list:*),Bash(gh search issues:*)"
