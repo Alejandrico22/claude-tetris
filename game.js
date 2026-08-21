@@ -25,12 +25,34 @@ const THEME_STORAGE_KEY = 'tetris-theme';
 const START_LEVEL_STORAGE_KEY = 'tetris-start-level';
 const HIGHSCORES_STORAGE_KEY = 'tetris-highscores';
 const MAX_HIGHSCORES = 5;
+const SKIN_STORAGE_KEY = 'tetris-skin';
+
+// Dibuja el trazado (sin fill/stroke) de un rectángulo de esquinas redondeadas en `context`.
+// Definida una sola vez a nivel de módulo (no dentro de un drawBlock) porque draw() la
+// invoca potencialmente cientos de veces por frame (una por celda del tablero) — crear un
+// closure nuevo en cada llamada sería descartar trabajo de GC innecesario en ese hot path.
+// La usa el skin "pastel"; cualquier otro skin con esquinas redondeadas puede reutilizarla.
+function roundedRectPath(context, x0, y0, w0, h0, r0) {
+  context.beginPath();
+  if (typeof context.roundRect === 'function') {
+    context.roundRect(x0, y0, w0, h0, r0);
+  } else {
+    // Fallback manual (sin roundRect nativo): construye el rectángulo redondeado con arcTo.
+    context.moveTo(x0 + r0, y0);
+    context.arcTo(x0 + w0, y0, x0 + w0, y0 + h0, r0);
+    context.arcTo(x0 + w0, y0 + h0, x0, y0 + h0, r0);
+    context.arcTo(x0, y0 + h0, x0, y0, r0);
+    context.arcTo(x0, y0, x0 + w0, y0, r0);
+    context.closePath();
+  }
+}
 
 // ---- Skins (apariencia del tablero) ----
-// Registro de aspectos visuales. De momento solo existe "retro" (el look original,
-// sin cambios respecto a antes del refactor). Los skins nuevos (neon, pastel, pixel...)
-// solo necesitan añadir una entrada aquí con su propio `colors`, `gridColor` y `drawBlock`;
-// draw()/drawGrid() ya leen siempre de `activeSkin`, no hace falta tocarlos.
+// Registro de aspectos visuales. "retro" es el look original (sin cambios respecto a antes
+// del refactor); "neon", "pastel" y "pixel" son variantes añadidas después. Cualquier skin
+// nuevo solo necesita una entrada aquí con su propio `colors`, `gridColor` y `drawBlock`
+// (y opcionalmente `boardBg` para forzar un fondo de tablero fijo); draw()/drawGrid() ya
+// leen siempre de `activeSkin`, no hace falta tocarlos.
 const SKINS = {
   retro: {
     label: 'Retro',
@@ -54,6 +76,128 @@ const SKINS = {
       // highlight
       context.fillStyle = 'rgba(255,255,255,0.12)';
       context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+      context.globalAlpha = 1;
+    },
+  },
+
+  neon: {
+    label: 'Neon',
+    // Fondo negro puro forzado vía `boardBg` (ver draw()), independiente del tema claro/oscuro.
+    boardBg: '#000000',
+    colors: [
+      null,
+      '#00e5ff', // I - cyan neón
+      '#ffea00', // O - amarillo neón
+      '#e040fb', // T - magenta neón
+      '#00e676', // S - verde neón
+      '#ff1744', // Z - rojo neón
+      '#2979ff', // J - azul neón
+      '#ff9100', // L - naranja neón
+      '#f50057', // R (anillo) - rosa neón
+    ],
+    gridColor: { dark: '#1a1a1a', light: '#1a1a1a' },
+    drawBlock(context, x, y, colorIndex, size, alpha) {
+      if (!colorIndex) return;
+      context.globalAlpha = alpha ?? 1;
+      const color = this.colors[colorIndex];
+      context.shadowColor = color;
+      context.shadowBlur = 12;
+      context.fillStyle = color;
+      context.fillRect(x * size + 2, y * size + 2, size - 4, size - 4);
+      context.shadowBlur = 0; // evita contaminar el siguiente dibujado (grid, otros bloques)
+      context.fillStyle = 'rgba(255,255,255,0.25)';
+      context.fillRect(x * size + 2, y * size + 2, size - 4, 3);
+      context.globalAlpha = 1;
+    },
+  },
+
+  pastel: {
+    label: 'Pastel',
+    colors: [
+      null,
+      '#aee1e3', // I - celeste pastel
+      '#fff2b2', // O - amarillo pastel
+      '#d9bfe0', // T - lila pastel
+      '#bfe3c0', // S - verde pastel
+      '#f5c2c2', // Z - rojo pastel
+      '#b9d0ec', // J - azul pastel
+      '#f7d3ad', // L - naranja pastel
+      '#f2c1de', // R (anillo) - rosa pastel
+    ],
+    gridColor: { dark: '#2a2a3a', light: '#dcdce8' },
+    drawBlock(context, x, y, colorIndex, size, alpha) {
+      if (!colorIndex) return;
+      context.globalAlpha = alpha ?? 1;
+      const px = x * size + 2;
+      const py = y * size + 2;
+      const w = size - 4;
+      const h = size - 4;
+      const r = Math.min(6, w / 2, h / 2);
+
+      context.fillStyle = this.colors[colorIndex];
+      roundedRectPath(context, px, py, w, h, r);
+      context.fill();
+
+      // highlight suave en la mitad superior
+      context.fillStyle = 'rgba(255,255,255,0.35)';
+      roundedRectPath(context, px, py, w, Math.max(1, h / 2.5), r);
+      context.fill();
+
+      context.globalAlpha = 1;
+    },
+  },
+
+  pixel: {
+    label: 'Pixel',
+    colors: [
+      null,
+      '#4dd0e1', // I - cyan
+      '#ffd54f', // O - yellow
+      '#ba68c8', // T - purple
+      '#81c784', // S - green
+      '#e57373', // Z - red
+      '#64b5f6', // J - blue
+      '#ffb74d', // L - orange
+      '#f06292', // R (anillo) - rosa
+    ],
+    gridColor: { dark: '#22222e', light: '#c8c8d8' },
+    drawBlock(context, x, y, colorIndex, size, alpha) {
+      if (!colorIndex) return;
+      context.globalAlpha = alpha ?? 1;
+      const px = x * size + 1;
+      const py = y * size + 1;
+      const w = size - 2;
+      const h = size - 2;
+      const sub = w / 4; // patrón de sub-celdas 4x4, estilo pixel-art/dithering
+
+      context.fillStyle = this.colors[colorIndex];
+      context.fillRect(px, py, w, h);
+
+      // sub-celdas más oscuras (dithering)
+      context.fillStyle = 'rgba(0,0,0,0.15)';
+      for (let sr = 0; sr < 4; sr++) {
+        for (let sc = 0; sc < 4; sc++) {
+          if ((sr + sc) % 3 === 0) {
+            context.fillRect(px + sc * sub, py + sr * sub, sub, sub);
+          }
+        }
+      }
+
+      // sub-celdas más claras (dithering)
+      context.fillStyle = 'rgba(255,255,255,0.18)';
+      for (let sr = 0; sr < 4; sr++) {
+        for (let sc = 0; sc < 4; sc++) {
+          if ((sr + sc) % 5 === 1) {
+            context.fillRect(px + sc * sub, py + sr * sub, sub, sub);
+          }
+        }
+      }
+
+      // borde nítido tipo pixel-art
+      context.strokeStyle = 'rgba(0,0,0,0.35)';
+      context.lineWidth = 1;
+      context.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1);
+
       context.globalAlpha = 1;
     },
   },
@@ -95,10 +239,19 @@ const nextCtx = nextCanvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const linesEl = document.getElementById('lines');
 const levelEl = document.getElementById('level');
+const comboEl = document.getElementById('combo');
 const playBtn = document.getElementById('play-btn');
 const restartBtn = document.getElementById('restart-btn');
 const gameoverScoreEl = document.getElementById('gameover-score');
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
+const pauseMainEl = document.getElementById('pause-main');
+const pauseControlsEl = document.getElementById('pause-controls');
+const pauseResumeBtn = document.getElementById('pause-resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const pauseControlsBtn = document.getElementById('pause-controls-btn');
+const pauseControlsBackBtn = document.getElementById('pause-controls-back-btn');
+const startLevelSelect = document.getElementById('start-level-select');
+const skinSelect = document.getElementById('skin-select');
 const highscoresStartEl = document.getElementById('highscores-start');
 const highscoresGameoverEl = document.getElementById('highscores-gameover');
 const resetHighscoresBtn = document.getElementById('reset-highscores-btn');
@@ -130,7 +283,17 @@ let theme;
 let started = false; // true desde el primer startGame(); antes de eso board/current/paused/gameOver no existen todavía
 let menuOpen;   // true mientras un submenú (pausa, controles...) debe bloquear el juego
 let combo, maxCombo, maxLines; // estadísticas de la partida en curso (unidad 2 las alimenta, unidad 3 las lee al game over)
-let startLevel = loadJSON(START_LEVEL_STORAGE_KEY, 1); // preferencia persistida; el selector de nivel (unidad 1) la actualiza
+
+// Fuerza el valor a un entero 1–15 (rango del selector de nivel inicial). Protege contra
+// un valor corrupto/fuera de rango en localStorage (editado a mano, o de una versión
+// anterior con otro rango) que de otro modo dejaría `level`/`dropInterval` en NaN.
+function clampStartLevel(value) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(15, Math.max(1, n));
+}
+
+let startLevel = clampStartLevel(loadJSON(START_LEVEL_STORAGE_KEY, 1)); // preferencia persistida; el selector de nivel la actualiza
 
 function applyTheme(t) {
   theme = t;
@@ -141,6 +304,41 @@ function applyTheme(t) {
 
 function toggleTheme() {
   applyTheme(theme === 'light' ? 'dark' : 'light');
+}
+
+// Rellena el <select> con una opción por cada entrada de SKINS (fuente única de verdad).
+function populateSkinSelect() {
+  for (const key in SKINS) {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = SKINS[key].label;
+    skinSelect.appendChild(opt);
+  }
+}
+
+// Resuelve una clave de skin a una clave válida y propia de SKINS, con fallback a 'retro'.
+// hasOwnProperty evita que una clave arbitraria (p.ej. un valor legado/manipulado en
+// localStorage como "constructor" o "toString") resuelva a una propiedad heredada de
+// Object.prototype en vez de a un skin real.
+function resolveSkinKey(key) {
+  return Object.prototype.hasOwnProperty.call(SKINS, key) ? key : 'retro';
+}
+
+// Aplica un skin por su clave (con fallback a 'retro' si la clave no es válida) y, si hay
+// una partida ya iniciada, fuerza un repintado inmediato del tablero y de la vista previa de
+// "siguiente pieza". Si `started` es false (pantalla de inicio, sin `board`/`current`/`next`
+// todavía) NO se llama a draw()/drawNext(): no hay nada que redibujar.
+function applySkin(key) {
+  activeSkin = SKINS[resolveSkinKey(key)];
+  if (started) {
+    draw();
+    drawNext();
+  }
+}
+
+function changeSkin() {
+  applySkin(skinSelect.value);
+  saveJSON(SKIN_STORAGE_KEY, skinSelect.value);
 }
 
 function createBoard() {
@@ -241,7 +439,16 @@ function softDrop() {
 
 function lockPiece() {
   merge();
-  clearLines();
+  const cleared = clearLines();
+  if (cleared > 0) {
+    combo++;
+    if (combo > 1) score += 50 * combo * level; // bonus de combo a partir del 2º encadenado
+    maxCombo = Math.max(maxCombo, combo);
+    maxLines = Math.max(maxLines, cleared);
+  } else {
+    combo = 0;
+  }
+  updateHUD(); // única llamada: refleja combo/score tras clearLines(), que ya actualizó score/lines/level
   spawn();
 }
 
@@ -258,6 +465,7 @@ function updateHUD() {
   scoreEl.textContent = score.toLocaleString();
   linesEl.textContent = lines;
   levelEl.textContent = level;
+  comboEl.textContent = combo > 1 ? `x${combo}` : '—';
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
@@ -283,6 +491,11 @@ function drawGrid() {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Algunos skins (p.ej. neon) fuerzan un fondo propio independiente del tema claro/oscuro.
+  if (activeSkin.boardBg) {
+    ctx.fillStyle = activeSkin.boardBg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
   drawGrid();
 
   // board
@@ -306,6 +519,12 @@ function draw() {
 function drawNext() {
   const NB = 30;
   nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+  // Igual que en draw(): si el skin fuerza un fondo propio, también debe aplicarse aquí
+  // para que la vista previa de "siguiente pieza" no desentone con el tablero principal.
+  if (activeSkin.boardBg) {
+    nextCtx.fillStyle = activeSkin.boardBg;
+    nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+  }
   const shape = next.shape;
   const offX = Math.floor((4 - shape[0].length) / 2);
   const offY = Math.floor((4 - shape.length) / 2);
@@ -420,13 +639,44 @@ function togglePause() {
   if (!started || gameOver) return;
   paused = !paused;
   if (!paused) {
+    menuOpen = false;
     hideScreens();
     lastTime = performance.now();
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
+    showPauseMain(); // el menú de pausa siempre abre en las opciones principales
     showScreen('pause');
   }
+}
+
+// Sub-vistas dentro del menú de pausa: opciones principales <-> lista de controles.
+// Mismo patrón que showScreen()/screens: un registro + una función que muestra una y
+// oculta las demás, así una futura tercera sub-vista no obliga a tocar las existentes.
+const pauseViews = { main: pauseMainEl, controls: pauseControlsEl };
+
+function showPauseView(name) {
+  for (const key in pauseViews) pauseViews[key].classList.toggle('hidden', key !== name);
+}
+
+// menuOpen se usa aquí para que Escape/P, mientras se ven los controles, vuelvan a las
+// opciones principales del menú en vez de cerrar la pausa (ver keydown más abajo).
+function showPauseMain() {
+  menuOpen = false;
+  startLevelSelect.value = String(startLevel); // refleja el valor actual de la variable
+  showPauseView('main');
+}
+
+function showPauseControls() {
+  menuOpen = true;
+  showPauseView('controls');
+}
+
+// Cambia el nivel con el que empezará la PRÓXIMA partida (init() ya lee startLevel).
+// Actualiza la variable en memoria Y persiste, para que el cambio se aplique sin recargar.
+function handleStartLevelChange(e) {
+  startLevel = clampStartLevel(e.target.value);
+  saveJSON(START_LEVEL_STORAGE_KEY, startLevel);
 }
 
 // True si el juego debe aceptar teclas de movimiento/rotación/caída ahora mismo.
@@ -481,12 +731,28 @@ function startGame() {
 }
 
 document.addEventListener('keydown', e => {
-  // Mientras el foco esté en un campo de texto/selector (p.ej. el nombre en la tabla
-  // de records o el selector de nivel), no interceptamos ninguna tecla del juego.
   const active = document.activeElement;
-  if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')) return;
+  // Mientras se escribe en un campo de texto (p.ej. el nombre en la tabla de records),
+  // no interceptamos NINGUNA tecla del juego, ni siquiera P/Esc, para no robarle letras
+  // al texto que el usuario está escribiendo.
+  const typingText = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+  if (typingText) return;
 
-  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    // Si estamos en la sub-vista de controles dentro de la pausa, primero volvemos a las
+    // opciones principales del menú en vez de cerrar la pausa directamente. P/Esc deben
+    // funcionar siempre aquí, incluso con el <select> de nivel enfocado (a diferencia de
+    // un campo de texto, un <select> no "escribe" letras al pulsarlas).
+    if (started && paused && menuOpen) {
+      showPauseMain();
+    } else {
+      togglePause();
+    }
+    return;
+  }
+  // Fuera de P/Esc, un <select> enfocado (p.ej. el selector de nivel) sí debe seguir
+  // recibiendo sus propias teclas (flechas) sin que el juego las intercepte.
+  if (active && active.tagName === 'SELECT') return;
   if (!gameInputEnabled()) return;
   switch (e.code) {
     case 'ArrowLeft':
@@ -513,6 +779,12 @@ document.addEventListener('keydown', e => {
 playBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
 themeToggleBtn.addEventListener('click', toggleTheme);
+pauseResumeBtn.addEventListener('click', togglePause);
+pauseRestartBtn.addEventListener('click', startGame);
+pauseControlsBtn.addEventListener('click', showPauseControls);
+pauseControlsBackBtn.addEventListener('click', showPauseMain);
+startLevelSelect.addEventListener('change', handleStartLevelChange);
+skinSelect.addEventListener('change', changeSkin);
 resetHighscoresBtn.addEventListener('click', resetHighscores);
 saveHighscoreBtn.addEventListener('click', saveHighscoreEntry);
 highscoreNameInput.addEventListener('keydown', e => {
@@ -520,5 +792,14 @@ highscoreNameInput.addEventListener('keydown', e => {
 });
 
 applyTheme(loadJSON(THEME_STORAGE_KEY, 'dark'));
+startLevelSelect.value = String(startLevel); // refleja la preferencia persistida desde el arranque
+
+populateSkinSelect();
+// Restaura el skin guardado, con fallback a 'retro' si no hay clave guardada o ya no es válida.
+// `started` sigue siendo false aquí, así que applySkin() solo fija `activeSkin` sin repintar.
+const savedSkinKey = loadJSON(SKIN_STORAGE_KEY, 'retro');
+skinSelect.value = resolveSkinKey(savedSkinKey);
+applySkin(savedSkinKey);
+
 showScreen('start');
 renderHighscores(highscoresStartEl); // puebla la tabla de records ya en la pantalla de inicio

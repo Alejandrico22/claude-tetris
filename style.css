@@ -130,6 +130,31 @@ body {
   color: var(--restart-color);
 }
 
+/* ---- Selector de skin ---- */
+.skin-select-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+#skin-select {
+  background: var(--kbd-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+#skin-select:hover {
+  background: var(--restart-bg);
+  color: var(--restart-color);
+}
+
 /* ---- Controles ---- */
 .controls ul {
   list-style: none;
@@ -213,6 +238,7 @@ kbd {
   background: var(--restart-hover-bg);
 }
 
+/* Estados adicionales del botón principal (también se usa como "Guardar" pequeño en el formulario de records) */
 .primary-btn:disabled {
   opacity: 0.5;
   cursor: default;
@@ -228,21 +254,74 @@ kbd {
   font-size: 12px;
 }
 
-/* ---- Botón secundario (borrar records) ---- */
-.secondary-btn {
-  background: transparent;
-  color: var(--controls-color);
+/* ---- Menú de pausa ---- */
+.pause-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.pause-view.hidden {
+  display: none;
+}
+
+.pause-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.pause-field label {
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--label-color);
+  font-weight: 600;
+}
+
+.pause-field select {
+  background: var(--kbd-bg);
+  color: var(--text-color);
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 6px 14px;
-  font-size: 11px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: inherit;
   cursor: pointer;
+}
+
+/* Botón secundario (acciones no principales: Ver controles / Volver / Borrar records) */
+.secondary-btn {
+  margin-top: 4px;
+  background: transparent;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.5px;
   transition: background 0.15s, color 0.15s;
 }
 
 .secondary-btn:hover {
   background: var(--kbd-bg);
   color: var(--text-color);
+}
+
+/* Variante compacta (p.ej. "Borrar records", junto a la tabla) */
+.secondary-btn.small-btn {
+  margin-top: 0;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: normal;
+  letter-spacing: normal;
+  color: var(--controls-color);
 }
 
 /* ---- Tabla de records ---- */
