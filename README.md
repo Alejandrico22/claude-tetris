@@ -3,6 +3,7 @@
 Implementación del clásico **Tetris** en JavaScript vanilla, usando HTML5 Canvas y CSS. Sin dependencias externas, sin frameworks, sin proceso de build: solo abrir y jugar.
 
 ![Tech](https://img.shields.io/badge/HTML5-Canvas-orange)
+<!-- PR de prueba para verificar el workflow claude-code-review.yml -->
 ![Tech](https://img.shields.io/badge/CSS3-blueviolet)
 ![Tech](https://img.shields.io/badge/JavaScript-Vanilla-yellow)
 
