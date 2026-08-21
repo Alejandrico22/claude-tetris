@@ -25,8 +25,8 @@ There is no build, lint, or test tooling in this repo — verify changes by relo
 
 ## Architecture (all in `game.js`)
 
-- **Board model**: `board` is a `ROWS × COLS` (20×10) matrix of `0` (empty) or a color index `1–7` identifying which piece type locked there. `COLORS[0]` is `null` (unused/empty sentinel).
-- **Pieces**: the 7 standard tetrominoes are defined in `PIECES` as square matrices (index 0 unused, matching `COLORS`). A piece object is `{ type, shape, x, y }` where `shape` is the current (possibly rotated) matrix and `x, y` is the top-left offset on the board. Keep `PIECES` and `COLORS` index-aligned when adding/changing piece types.
+- **Board model**: `board` is a `ROWS × COLS` (20×10) matrix of `0` (empty) or a color index `1–8` identifying which piece type locked there. `COLORS[0]` is `null` (unused/empty sentinel).
+- **Pieces**: the 7 standard tetrominoes plus one special piece (type `8`, `RING_TYPE`) are defined in `PIECES` as square matrices (index 0 unused, matching `COLORS`). The ring is a 3×3 shape fully filled except its center cell — that center becomes a permanently unreachable empty cell once locked into `board` (it's enclosed by the ring's own blocks), so any row containing it can never be cleared. `randomPiece()` rolls the ring with `RING_CHANCE` probability, otherwise picks uniformly among types `1..RING_TYPE-1`. A piece object is `{ type, shape, x, y }` where `shape` is the current (possibly rotated) matrix and `x, y` is the top-left offset on the board. Keep `PIECES` and `COLORS` index-aligned when adding/changing piece types.
 - **Rotation**: `rotateCW(shape)` computes a new matrix via transpose + row reversal — it does not mutate in place. `tryRotate()` applies it to `current`, then attempts a small set of wall-kick offsets (`[0, -1, 1, -2, 2]` columns) via `collide()`, keeping the first that doesn't collide and silently no-opping if none work.
 - **Collision** (`collide(shape, ox, oy)`): true if any filled cell of `shape` at offset `(ox, oy)` is out of bounds (left/right/bottom — top is unbounded, allowing spawn above the visible board) or overlaps an already-locked board cell. Used for movement, rotation, ghost-piece projection, and hard/soft drop.
 - **Locking flow**: `lockPiece()` → `merge()` (writes `current.shape` into `board`) → `clearLines()` → `spawn()` (promotes `next` to `current`, generates a new `next`, and calls `endGame()` if the new piece immediately collides at spawn).
@@ -41,4 +41,4 @@ There is no build, lint, or test tooling in this repo — verify changes by relo
 ## Notes
 
 - Code and comments are in Spanish (README) / minimal inline English comments in `game.js` — match existing convention when editing.
-- Tunable constants live at the top of `game.js`: `COLS`, `ROWS`, `BLOCK` (cell size), `COLORS`, `LINE_SCORES`, initial `dropInterval`. If `COLS`/`ROWS`/`BLOCK` change, update the `board` canvas `width`/`height` in `index.html` to match (`COLS × BLOCK` by `ROWS × BLOCK`).
+- Tunable constants live at the top of `game.js`: `COLS`, `ROWS`, `BLOCK` (cell size), `COLORS`, `LINE_SCORES`, initial `dropInterval`, `RING_CHANCE` (spawn probability of the special ring piece). If `COLS`/`ROWS`/`BLOCK` change, update the `board` canvas `width`/`height` in `index.html` to match (`COLS × BLOCK` by `ROWS × BLOCK`).

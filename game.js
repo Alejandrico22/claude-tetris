@@ -13,6 +13,7 @@ const COLORS = [
   '#e57373', // Z - red
   '#64b5f6', // J - blue
   '#ffb74d', // L - orange
+  '#f06292', // R (anillo) - rosa
 ];
 
 const PIECES = [
@@ -24,9 +25,13 @@ const PIECES = [
   [[5,5,0],[0,5,5],[0,0,0]],                  // Z
   [[6,0,0],[6,6,6],[0,0,0]],                  // J
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
+  [[8,8,8],[8,0,8],[8,8,8]],                  // R - anillo con hueco central permanente
 ];
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
+
+const RING_TYPE = 8;      // índice del anillo en PIECES / COLORS
+const RING_CHANCE = 1/16; // probabilidad de que salga el anillo en randomPiece()
 
 const GRID_COLORS = { dark: '#22222e', light: '#c8c8d8' };
 const THEME_STORAGE_KEY = 'tetris-theme';
@@ -63,7 +68,9 @@ function createBoard() {
 }
 
 function randomPiece() {
-  const type = Math.floor(Math.random() * 7) + 1;
+  const type = Math.random() < RING_CHANCE
+    ? RING_TYPE
+    : Math.floor(Math.random() * (RING_TYPE - 1)) + 1;
   const shape = PIECES[type].map(row => [...row]);
   return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
 }
