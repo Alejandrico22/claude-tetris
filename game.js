@@ -93,6 +93,7 @@ const nextCtx = nextCanvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const linesEl = document.getElementById('lines');
 const levelEl = document.getElementById('level');
+const comboEl = document.getElementById('combo');
 const playBtn = document.getElementById('play-btn');
 const restartBtn = document.getElementById('restart-btn');
 const gameoverScoreEl = document.getElementById('gameover-score');
@@ -233,7 +234,16 @@ function softDrop() {
 
 function lockPiece() {
   merge();
-  clearLines();
+  const cleared = clearLines();
+  if (cleared > 0) {
+    combo++;
+    if (combo > 1) score += 50 * combo * level; // bonus de combo a partir del 2º encadenado
+    maxCombo = Math.max(maxCombo, combo);
+    maxLines = Math.max(maxLines, cleared);
+  } else {
+    combo = 0;
+  }
+  updateHUD(); // única llamada: refleja combo/score tras clearLines(), que ya actualizó score/lines/level
   spawn();
 }
 
@@ -250,6 +260,7 @@ function updateHUD() {
   scoreEl.textContent = score.toLocaleString();
   linesEl.textContent = lines;
   levelEl.textContent = level;
+  comboEl.textContent = combo > 1 ? `x${combo}` : '—';
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
