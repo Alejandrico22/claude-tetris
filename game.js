@@ -23,6 +23,8 @@ const RING_CHANCE = 1/16; // probabilidad de que salga el anillo en randomPiece(
 
 const THEME_STORAGE_KEY = 'tetris-theme';
 const START_LEVEL_STORAGE_KEY = 'tetris-start-level';
+const HIGHSCORES_STORAGE_KEY = 'tetris-highscores';
+const MAX_HIGHSCORES = 5;
 
 // ---- Skins (apariencia del tablero) ----
 // Registro de aspectos visuales. De momento solo existe "retro" (el look original,
@@ -97,6 +99,12 @@ const playBtn = document.getElementById('play-btn');
 const restartBtn = document.getElementById('restart-btn');
 const gameoverScoreEl = document.getElementById('gameover-score');
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
+const highscoresStartEl = document.getElementById('highscores-start');
+const highscoresGameoverEl = document.getElementById('highscores-gameover');
+const resetHighscoresBtn = document.getElementById('reset-highscores-btn');
+const highscoreFormEl = document.getElementById('highscore-form');
+const highscoreNameInput = document.getElementById('highscore-name-input');
+const saveHighscoreBtn = document.getElementById('save-highscore-btn');
 
 // ---- Gestor de pantallas ----
 // Tres paneles hermanos e independientes (inicio / pausa / game over), en vez del
@@ -306,11 +314,106 @@ function drawNext() {
       drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
 }
 
+// ---- Tabla de records local ----
+// Array de hasta MAX_HIGHSCORES objetos {name, score, lines, maxCombo, date},
+// ordenado descendente por score, persistido en tetris-highscores vía loadJSON/saveJSON.
+function loadHighscores() {
+  return loadJSON(HIGHSCORES_STORAGE_KEY, []);
+}
+
+function saveHighscores(list) {
+  saveJSON(HIGHSCORES_STORAGE_KEY, list);
+}
+
+// true si una partida con esta puntuación entraría en el top 5 actual
+// (hay hueco libre, o supera estrictamente a la última entrada del top 5).
+function qualifiesForHighscore(s) {
+  const list = loadHighscores();
+  if (list.length < MAX_HIGHSCORES) return true;
+  return s > list[list.length - 1].score;
+}
+
+// Inserta `entry` en la tabla, reordena por score descendente y recorta a MAX_HIGHSCORES.
+function addHighscore(entry) {
+  const list = loadHighscores();
+  list.push(entry);
+  list.sort((a, b) => b.score - a.score);
+  list.length = Math.min(list.length, MAX_HIGHSCORES);
+  saveHighscores(list);
+  return list;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Renderiza la tabla de records dentro de `container` (se usa tanto en #screen-start
+// como en #screen-gameover). Si `highlightDate` coincide con el `date` (ISO, con
+// milisegundos) de una fila, se le añade la clase highscore-row--new para resaltarla.
+// Se compara por valor (no por referencia) porque loadHighscores() siempre parsea JSON
+// de nuevo desde localStorage, así que nunca sería el mismo objeto en memoria. No lee
+// ninguna variable de partida en curso: solo depende de lo ya guardado en localStorage.
+function renderHighscores(container, highlightDate) {
+  const list = loadHighscores();
+  if (!list.length) {
+    container.innerHTML = '<p class="highscores-empty">Sin records todavía</p>';
+    return;
+  }
+  let html = '<table class="highscores-table-el"><thead><tr>' +
+    '<th>#</th><th>Nombre</th><th>Puntos</th><th>Líneas</th><th>Combo</th><th>Fecha</th>' +
+    '</tr></thead><tbody>';
+  list.forEach((entry, i) => {
+    const isNew = highlightDate && entry.date === highlightDate;
+    html += `<tr class="${isNew ? 'highscore-row--new' : ''}">` +
+      `<td>${i + 1}</td>` +
+      `<td>${escapeHtml(entry.name)}</td>` +
+      `<td>${entry.score.toLocaleString()}</td>` +
+      `<td>${entry.lines}</td>` +
+      `<td>${entry.maxCombo}</td>` +
+      `<td>${new Date(entry.date).toLocaleDateString()}</td>` +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// Handler del botón "Guardar" del formulario de nuevo record en game over.
+// lines/maxCombo son las variables globales de la partida recién terminada
+// (endGame() las deja intactas hasta el próximo init()).
+function saveHighscoreEntry() {
+  if (saveHighscoreBtn.disabled) return; // evita duplicar la entrada con un doble clic
+  saveHighscoreBtn.disabled = true;
+  const name = (highscoreNameInput.value || '').trim().slice(0, 12) || 'Jugador';
+  const entryDate = new Date().toISOString();
+  addHighscore({ name, score, lines, maxCombo, date: entryDate });
+  highscoreFormEl.classList.add('hidden');
+  renderHighscores(highscoresGameoverEl, entryDate);
+  renderHighscores(highscoresStartEl);
+}
+
+function resetHighscores() {
+  if (!confirm('¿Seguro que quieres borrar todos los records?')) return;
+  saveHighscores([]);
+  renderHighscores(highscoresStartEl);
+  renderHighscores(highscoresGameoverEl);
+}
+
 function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
   gameoverScoreEl.textContent = `Puntuación: ${score.toLocaleString()}`;
   showScreen('gameover');
+
+  if (qualifiesForHighscore(score)) {
+    highscoreNameInput.value = '';
+    saveHighscoreBtn.disabled = false;
+    highscoreFormEl.classList.remove('hidden');
+  } else {
+    highscoreFormEl.classList.add('hidden');
+  }
+  renderHighscores(highscoresGameoverEl);
 }
 
 function togglePause() {
@@ -410,6 +513,12 @@ document.addEventListener('keydown', e => {
 playBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
 themeToggleBtn.addEventListener('click', toggleTheme);
+resetHighscoresBtn.addEventListener('click', resetHighscores);
+saveHighscoreBtn.addEventListener('click', saveHighscoreEntry);
+highscoreNameInput.addEventListener('keydown', e => {
+  if (e.code === 'Enter' || e.code === 'NumpadEnter') { e.preventDefault(); saveHighscoreEntry(); }
+});
 
 applyTheme(loadJSON(THEME_STORAGE_KEY, 'dark'));
 showScreen('start');
+renderHighscores(highscoresStartEl); // puebla la tabla de records ya en la pantalla de inicio

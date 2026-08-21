@@ -212,3 +212,135 @@ kbd {
 .primary-btn:hover {
   background: var(--restart-hover-bg);
 }
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.primary-btn:disabled:hover {
+  background: var(--restart-bg);
+}
+
+.primary-btn.small-btn {
+  margin-top: 0;
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
+/* ---- Botón secundario (borrar records) ---- */
+.secondary-btn {
+  background: transparent;
+  color: var(--controls-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.secondary-btn:hover {
+  background: var(--kbd-bg);
+  color: var(--text-color);
+}
+
+/* ---- Tabla de records ---- */
+.overlay-box.highscores-box {
+  max-width: 400px;
+  max-height: 580px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.highscores-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.highscores-title {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--label-color);
+  font-weight: 600;
+}
+
+.highscores-table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.highscores-table-el {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+}
+
+.highscores-table-el th,
+.highscores-table-el td {
+  padding: 3px 6px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-color);
+  white-space: nowrap;
+}
+
+.highscores-table-el th {
+  color: var(--label-color);
+  font-weight: 600;
+  letter-spacing: 1px;
+  font-size: 10px;
+}
+
+.highscores-table-el td:nth-child(2) {
+  text-align: left;
+}
+
+.highscore-row--new {
+  background: rgba(122, 162, 247, 0.2);
+  color: var(--value-color);
+  font-weight: 700;
+}
+
+.highscores-empty {
+  font-size: 12px;
+  color: var(--controls-color);
+}
+
+/* ---- Formulario de nuevo record (game over) ---- */
+.highscore-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--overlay-score-color);
+}
+
+.highscore-form.hidden {
+  display: none;
+}
+
+.highscore-form-row {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.highscore-form-row input {
+  flex: 1;
+  min-width: 0;
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: var(--text-color);
+  font-family: inherit;
+  font-size: 12px;
+}

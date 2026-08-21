@@ -49,9 +49,14 @@
 
     <!-- Pantalla de inicio: se muestra al cargar la página, antes de la primera partida -->
     <div id="screen-start" class="overlay">
-      <div class="overlay-box">
+      <div class="overlay-box highscores-box">
         <p class="screen-title">TETRIS</p>
         <button id="play-btn" class="primary-btn">Jugar</button>
+        <div class="highscores-section">
+          <p class="highscores-title">RECORDS</p>
+          <div class="highscores-table" id="highscores-start"></div>
+          <button id="reset-highscores-btn" class="secondary-btn">Borrar records</button>
+        </div>
       </div>
     </div>
 
@@ -64,9 +69,20 @@
 
     <!-- Pantalla de fin de partida -->
     <div id="screen-gameover" class="overlay hidden">
-      <div class="overlay-box">
+      <div class="overlay-box highscores-box">
         <p class="screen-title">GAME OVER</p>
         <p id="gameover-score"></p>
+        <div id="highscore-form" class="highscore-form hidden">
+          <label for="highscore-name-input">¡Nuevo record! Introduce tu nombre:</label>
+          <div class="highscore-form-row">
+            <input type="text" id="highscore-name-input" maxlength="12" placeholder="Nombre" autocomplete="off" />
+            <button id="save-highscore-btn" class="primary-btn small-btn">Guardar</button>
+          </div>
+        </div>
+        <div class="highscores-section">
+          <p class="highscores-title">RECORDS</p>
+          <div class="highscores-table" id="highscores-gameover"></div>
+        </div>
         <button id="restart-btn" class="primary-btn">Reiniciar</button>
       </div>
     </div>
