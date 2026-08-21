@@ -59,6 +59,49 @@
     <div id="screen-pause" class="overlay hidden">
       <div class="overlay-box" id="pause-content">
         <p class="screen-title">PAUSA</p>
+
+        <!-- Opciones principales del menú de pausa -->
+        <div id="pause-main" class="pause-view">
+          <button id="pause-resume-btn" class="primary-btn">Reanudar</button>
+          <button id="pause-restart-btn" class="primary-btn">Reiniciar</button>
+
+          <div class="pause-field">
+            <label for="start-level-select">Nivel inicial</label>
+            <select id="start-level-select">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+              <option value="10">10</option>
+              <option value="11">11</option>
+              <option value="12">12</option>
+              <option value="13">13</option>
+              <option value="14">14</option>
+              <option value="15">15</option>
+            </select>
+          </div>
+
+          <button id="pause-controls-btn" class="secondary-btn">Ver controles</button>
+        </div>
+
+        <!-- Sub-vista: lista de controles (permanece dentro del menú de pausa) -->
+        <div id="pause-controls" class="pause-view hidden">
+          <div class="controls">
+            <ul>
+              <li><kbd>←</kbd><kbd>→</kbd> mover</li>
+              <li><kbd>↑</kbd> rotar</li>
+              <li><kbd>↓</kbd> bajar</li>
+              <li><kbd>Space</kbd> caída</li>
+              <li><kbd>P</kbd><kbd>Esc</kbd> pausa</li>
+            </ul>
+          </div>
+          <button id="pause-controls-back-btn" class="secondary-btn">Volver</button>
+        </div>
       </div>
     </div>
 

@@ -97,6 +97,13 @@ const playBtn = document.getElementById('play-btn');
 const restartBtn = document.getElementById('restart-btn');
 const gameoverScoreEl = document.getElementById('gameover-score');
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
+const pauseMainEl = document.getElementById('pause-main');
+const pauseControlsEl = document.getElementById('pause-controls');
+const pauseResumeBtn = document.getElementById('pause-resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const pauseControlsBtn = document.getElementById('pause-controls-btn');
+const pauseControlsBackBtn = document.getElementById('pause-controls-back-btn');
+const startLevelSelect = document.getElementById('start-level-select');
 
 // ---- Gestor de pantallas ----
 // Tres paneles hermanos e independientes (inicio / pausa / game over), en vez del
@@ -122,7 +129,17 @@ let theme;
 let started = false; // true desde el primer startGame(); antes de eso board/current/paused/gameOver no existen todavía
 let menuOpen;   // true mientras un submenú (pausa, controles...) debe bloquear el juego
 let combo, maxCombo, maxLines; // estadísticas de la partida en curso (unidad 2 las alimenta, unidad 3 las lee al game over)
-let startLevel = loadJSON(START_LEVEL_STORAGE_KEY, 1); // preferencia persistida; el selector de nivel (unidad 1) la actualiza
+
+// Fuerza el valor a un entero 1–15 (rango del selector de nivel inicial). Protege contra
+// un valor corrupto/fuera de rango en localStorage (editado a mano, o de una versión
+// anterior con otro rango) que de otro modo dejaría `level`/`dropInterval` en NaN.
+function clampStartLevel(value) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(15, Math.max(1, n));
+}
+
+let startLevel = clampStartLevel(loadJSON(START_LEVEL_STORAGE_KEY, 1)); // preferencia persistida; el selector de nivel la actualiza
 
 function applyTheme(t) {
   theme = t;
@@ -317,13 +334,44 @@ function togglePause() {
   if (!started || gameOver) return;
   paused = !paused;
   if (!paused) {
+    menuOpen = false;
     hideScreens();
     lastTime = performance.now();
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
+    showPauseMain(); // el menú de pausa siempre abre en las opciones principales
     showScreen('pause');
   }
+}
+
+// Sub-vistas dentro del menú de pausa: opciones principales <-> lista de controles.
+// Mismo patrón que showScreen()/screens: un registro + una función que muestra una y
+// oculta las demás, así una futura tercera sub-vista no obliga a tocar las existentes.
+const pauseViews = { main: pauseMainEl, controls: pauseControlsEl };
+
+function showPauseView(name) {
+  for (const key in pauseViews) pauseViews[key].classList.toggle('hidden', key !== name);
+}
+
+// menuOpen se usa aquí para que Escape/P, mientras se ven los controles, vuelvan a las
+// opciones principales del menú en vez de cerrar la pausa (ver keydown más abajo).
+function showPauseMain() {
+  menuOpen = false;
+  startLevelSelect.value = String(startLevel); // refleja el valor actual de la variable
+  showPauseView('main');
+}
+
+function showPauseControls() {
+  menuOpen = true;
+  showPauseView('controls');
+}
+
+// Cambia el nivel con el que empezará la PRÓXIMA partida (init() ya lee startLevel).
+// Actualiza la variable en memoria Y persiste, para que el cambio se aplique sin recargar.
+function handleStartLevelChange(e) {
+  startLevel = clampStartLevel(e.target.value);
+  saveJSON(START_LEVEL_STORAGE_KEY, startLevel);
 }
 
 // True si el juego debe aceptar teclas de movimiento/rotación/caída ahora mismo.
@@ -378,12 +426,28 @@ function startGame() {
 }
 
 document.addEventListener('keydown', e => {
-  // Mientras el foco esté en un campo de texto/selector (p.ej. el nombre en la tabla
-  // de records o el selector de nivel), no interceptamos ninguna tecla del juego.
   const active = document.activeElement;
-  if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')) return;
+  // Mientras se escribe en un campo de texto (p.ej. el nombre en la tabla de records),
+  // no interceptamos NINGUNA tecla del juego, ni siquiera P/Esc, para no robarle letras
+  // al texto que el usuario está escribiendo.
+  const typingText = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+  if (typingText) return;
 
-  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    // Si estamos en la sub-vista de controles dentro de la pausa, primero volvemos a las
+    // opciones principales del menú en vez de cerrar la pausa directamente. P/Esc deben
+    // funcionar siempre aquí, incluso con el <select> de nivel enfocado (a diferencia de
+    // un campo de texto, un <select> no "escribe" letras al pulsarlas).
+    if (started && paused && menuOpen) {
+      showPauseMain();
+    } else {
+      togglePause();
+    }
+    return;
+  }
+  // Fuera de P/Esc, un <select> enfocado (p.ej. el selector de nivel) sí debe seguir
+  // recibiendo sus propias teclas (flechas) sin que el juego las intercepte.
+  if (active && active.tagName === 'SELECT') return;
   if (!gameInputEnabled()) return;
   switch (e.code) {
     case 'ArrowLeft':
@@ -410,6 +474,12 @@ document.addEventListener('keydown', e => {
 playBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
 themeToggleBtn.addEventListener('click', toggleTheme);
+pauseResumeBtn.addEventListener('click', togglePause);
+pauseRestartBtn.addEventListener('click', startGame);
+pauseControlsBtn.addEventListener('click', showPauseControls);
+pauseControlsBackBtn.addEventListener('click', showPauseMain);
+startLevelSelect.addEventListener('change', handleStartLevelChange);
 
 applyTheme(loadJSON(THEME_STORAGE_KEY, 'dark'));
+startLevelSelect.value = String(startLevel); // refleja la preferencia persistida desde el arranque
 showScreen('start');
