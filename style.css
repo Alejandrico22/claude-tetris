@@ -178,22 +178,24 @@ kbd {
   flex-direction: column;
   gap: 12px;
   align-items: center;
+  max-width: 240px;
 }
 
-#overlay-title {
+.screen-title {
   font-size: 28px;
   font-weight: 800;
   letter-spacing: 4px;
   color: var(--overlay-title-color);
 }
 
-#overlay-score {
+#gameover-score {
   font-family: 'Courier New', Courier, monospace;
   font-size: 14px;
   color: var(--overlay-score-color);
 }
 
-#restart-btn {
+/* Botón principal reutilizado por las 3 pantallas (Jugar / Reiniciar / Reanudar...) */
+.primary-btn {
   margin-top: 8px;
   background: var(--restart-bg);
   color: var(--restart-color);
@@ -207,6 +209,6 @@ kbd {
   transition: background 0.15s;
 }
 
-#restart-btn:hover {
+.primary-btn:hover {
   background: var(--restart-hover-bg);
 }

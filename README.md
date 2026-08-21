@@ -46,7 +46,8 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Vista previa** de la siguiente pieza.
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
-- **Pausa** y **Game Over** con opción de reinicio.
+- **Pantalla de inicio** al cargar la página; la partida no arranca hasta pulsar "Jugar".
+- **Pausa** (tecla `P` o `Esc`) y **Game Over**, cada una con su propia pantalla, con opción de reinicio.
 
 ---
 
@@ -89,7 +90,7 @@ Después abre `http://localhost:8000` en el navegador.
 | `↑` o `X` | Rotar la pieza en sentido horario |
 | `↓`       | Soft drop (bajar más rápido)      |
 | `Espacio` | Hard drop (caída instantánea)     |
-| `P`       | Pausar / reanudar                 |
+| `P` / `Esc` | Pausar / reanudar                |
 
 ---
 
@@ -103,7 +104,7 @@ Define la estructura visual:
 
 - Un `<canvas id="board">` de **300 × 600** píxeles donde se renderiza el tablero.
 - Un panel lateral con `SCORE`, `LINES`, `LEVEL`, vista de la siguiente pieza y la lista de controles.
-- Un overlay para los estados **PAUSA** y **GAME OVER**.
+- Tres pantallas superpuestas independientes (`#screen-start`, `#screen-pause`, `#screen-gameover`), mostradas/ocultadas por `game.js` — solo una visible a la vez.
 
 ### 2. `style.css`
 
@@ -120,28 +121,34 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Game loop** (`loop`): basado en `requestAnimationFrame`, acumula el tiempo transcurrido y baja la pieza una fila cuando se supera `dropInterval`.
 - **Limpieza de líneas** (`clearLines`): recorre el tablero de abajo hacia arriba; cada fila completa se elimina y se inserta una vacía en la cima.
 - **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
-- **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
+- **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos. El nivel inicial parte de `startLevel` (persistido en `localStorage`, `1` por defecto).
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
+- **Pantallas** (`screens` / `showScreen` / `hideScreens`): inicio, pausa y game over son tres elementos independientes; `showScreen(name)` muestra uno y oculta los otros dos.
+- **Skins** (`SKINS` / `activeSkin`): registro de aspectos visuales. Cada skin define su paleta de colores, el color de la rejilla y su propia función de pintado de bloque; `draw()`/`drawGrid()` siempre delegan en `activeSkin`.
+- **Persistencia** (`loadJSON` / `saveJSON`): envuelven `localStorage` en `try/catch` (puede fallar en modo privado o por cuota) bajo claves con prefijo `tetris-`.
 
 ### Flujo del juego
 
 ```
-init()
-  ├─ createBoard()                  → matriz vacía
-  ├─ next = randomPiece()
-  ├─ spawn()                        → mueve next a current y genera nueva next
+(carga de página)
+  ├─ applyTheme(...)
+  └─ showScreen('start')            → pantalla de inicio, sin partida activa
+
+"Jugar" / "Reiniciar" → startGame()
+  ├─ init()                         → resetea board, score, nivel (= startLevel), etc.
+  ├─ hideScreens()
   └─ requestAnimationFrame(loop)
         ↓
    loop(timestamp)
      ├─ acumula dt
      ├─ si dt ≥ dropInterval → baja la pieza o llama a lockPiece()
      ├─ draw()  (grid + tablero + ghost + pieza actual)
-     └─ requestAnimationFrame(loop)
+     └─ requestAnimationFrame(loop), salvo que gameOver ya sea true
 
-   keydown → mover / rotar / soft-drop / hard-drop / pausa
+   keydown → mover / rotar / soft-drop / hard-drop / pausa (P o Esc)
 ```
 
-Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara `endGame()` y se muestra el overlay de **Game Over**.
+Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara `endGame()` y se muestra la pantalla de **Game Over**.
 
 ---
 
@@ -178,9 +185,8 @@ Algunos parámetros fáciles de tunear en `game.js`:
 | `COLS`         | Columnas del tablero                     | `10`                  |
 | `ROWS`         | Filas del tablero                        | `20`                  |
 | `BLOCK`        | Tamaño en píxeles de cada celda          | `30`                  |
-| `COLORS`       | Paleta de colores por tipo de pieza      | 8 colores             |
+| `SKINS.retro.colors` | Paleta de colores por tipo de pieza | 8 colores             |
 | `LINE_SCORES`  | Puntos por 1, 2, 3 o 4 líneas eliminadas | `[0,100,300,500,800]` |
-| `dropInterval` | Velocidad inicial de caída en ms         | `1000`                |
 | `RING_CHANCE`  | Probabilidad de que salga el anillo 3×3  | `1/16`                |
 
 > Si cambias `COLS`, `ROWS` o `BLOCK`, recuerda ajustar también `width` y `height` del `<canvas id="board">` en `index.html` para que coincida (`COLS × BLOCK` × `ROWS × BLOCK`).
