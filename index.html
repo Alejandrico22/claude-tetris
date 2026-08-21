@@ -41,17 +41,33 @@
             <li><kbd>↑</kbd> rotar</li>
             <li><kbd>↓</kbd> bajar</li>
             <li><kbd>Space</kbd> caída</li>
-            <li><kbd>P</kbd> pausa</li>
+            <li><kbd>P</kbd><kbd>Esc</kbd> pausa</li>
           </ul>
         </div>
       </aside>
     </div>
 
-    <div id="overlay" class="overlay hidden">
+    <!-- Pantalla de inicio: se muestra al cargar la página, antes de la primera partida -->
+    <div id="screen-start" class="overlay">
       <div class="overlay-box">
-        <p id="overlay-title">GAME OVER</p>
-        <p id="overlay-score"></p>
-        <button id="restart-btn">Reiniciar</button>
+        <p class="screen-title">TETRIS</p>
+        <button id="play-btn" class="primary-btn">Jugar</button>
+      </div>
+    </div>
+
+    <!-- Menú de pausa: game.js lo muestra/oculta con showScreen()/hideScreens() -->
+    <div id="screen-pause" class="overlay hidden">
+      <div class="overlay-box" id="pause-content">
+        <p class="screen-title">PAUSA</p>
+      </div>
+    </div>
+
+    <!-- Pantalla de fin de partida -->
+    <div id="screen-gameover" class="overlay hidden">
+      <div class="overlay-box">
+        <p class="screen-title">GAME OVER</p>
+        <p id="gameover-score"></p>
+        <button id="restart-btn" class="primary-btn">Reiniciar</button>
       </div>
     </div>
   </div>

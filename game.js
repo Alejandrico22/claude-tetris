@@ -4,18 +4,6 @@ const COLS = 10;
 const ROWS = 20;
 const BLOCK = 30;
 
-const COLORS = [
-  null,
-  '#4dd0e1', // I - cyan
-  '#ffd54f', // O - yellow
-  '#ba68c8', // T - purple
-  '#81c784', // S - green
-  '#e57373', // Z - red
-  '#64b5f6', // J - blue
-  '#ffb74d', // L - orange
-  '#f06292', // R (anillo) - rosa
-];
-
 const PIECES = [
   null,
   [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], // I
@@ -30,11 +18,73 @@ const PIECES = [
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
-const RING_TYPE = 8;      // índice del anillo en PIECES / COLORS
+const RING_TYPE = 8;      // índice del anillo en PIECES / skin.colors
 const RING_CHANCE = 1/16; // probabilidad de que salga el anillo en randomPiece()
 
-const GRID_COLORS = { dark: '#22222e', light: '#c8c8d8' };
 const THEME_STORAGE_KEY = 'tetris-theme';
+const START_LEVEL_STORAGE_KEY = 'tetris-start-level';
+
+// ---- Skins (apariencia del tablero) ----
+// Registro de aspectos visuales. De momento solo existe "retro" (el look original,
+// sin cambios respecto a antes del refactor). Los skins nuevos (neon, pastel, pixel...)
+// solo necesitan añadir una entrada aquí con su propio `colors`, `gridColor` y `drawBlock`;
+// draw()/drawGrid() ya leen siempre de `activeSkin`, no hace falta tocarlos.
+const SKINS = {
+  retro: {
+    label: 'Retro',
+    colors: [
+      null,
+      '#4dd0e1', // I - cyan
+      '#ffd54f', // O - yellow
+      '#ba68c8', // T - purple
+      '#81c784', // S - green
+      '#e57373', // Z - red
+      '#64b5f6', // J - blue
+      '#ffb74d', // L - orange
+      '#f06292', // R (anillo) - rosa
+    ],
+    gridColor: { dark: '#22222e', light: '#c8c8d8' },
+    drawBlock(context, x, y, colorIndex, size, alpha) {
+      if (!colorIndex) return;
+      context.globalAlpha = alpha ?? 1;
+      context.fillStyle = this.colors[colorIndex];
+      context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+      // highlight
+      context.fillStyle = 'rgba(255,255,255,0.12)';
+      context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+      context.globalAlpha = 1;
+    },
+  },
+};
+
+let activeSkin = SKINS.retro; // el selector de skin (unidad 4) reasigna esto en caliente
+
+// ---- Helper de localStorage ----
+// Envuelve lectura/escritura en try/catch: localStorage puede lanzar en modo privado,
+// con cookies bloqueadas o por cuota excedida. Si eso pasa, el juego sigue funcionando
+// sin persistir preferencias en vez de romperse.
+function loadJSON(key, fallback) {
+  let raw;
+  try {
+    raw = localStorage.getItem(key);
+  } catch {
+    return fallback;
+  }
+  if (raw === null) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw; // compat: valor guardado como string plano antes de adoptar JSON (p.ej. tema legado)
+  }
+}
+
+function saveJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // no persistimos; el juego sigue funcionando con el valor solo en memoria
+  }
+}
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -43,20 +93,42 @@ const nextCtx = nextCanvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const linesEl = document.getElementById('lines');
 const levelEl = document.getElementById('level');
-const overlay = document.getElementById('overlay');
-const overlayTitle = document.getElementById('overlay-title');
-const overlayScore = document.getElementById('overlay-score');
+const playBtn = document.getElementById('play-btn');
 const restartBtn = document.getElementById('restart-btn');
+const gameoverScoreEl = document.getElementById('gameover-score');
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
+
+// ---- Gestor de pantallas ----
+// Tres paneles hermanos e independientes (inicio / pausa / game over), en vez del
+// antiguo #overlay único reescrito a base de cambiar su texto. Cada pantalla puede
+// evolucionar su propio contenido (menú de pausa, tabla de records...) sin pisar a
+// las demás. showScreen(null) o hideScreens() oculta las tres.
+const screens = {
+  start: document.getElementById('screen-start'),
+  pause: document.getElementById('screen-pause'),
+  gameover: document.getElementById('screen-gameover'),
+};
+
+function showScreen(name) {
+  for (const key in screens) screens[key].classList.toggle('hidden', key !== name);
+}
+
+function hideScreens() {
+  for (const key in screens) screens[key].classList.add('hidden');
+}
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let theme;
+let started = false; // true desde el primer startGame(); antes de eso board/current/paused/gameOver no existen todavía
+let menuOpen;   // true mientras un submenú (pausa, controles...) debe bloquear el juego
+let combo, maxCombo, maxLines; // estadísticas de la partida en curso (unidad 2 las alimenta, unidad 3 las lee al game over)
+let startLevel = loadJSON(START_LEVEL_STORAGE_KEY, 1); // preferencia persistida; el selector de nivel (unidad 1) la actualiza
 
 function applyTheme(t) {
   theme = t;
   document.body.classList.toggle('light-theme', t === 'light');
   themeToggleBtn.textContent = t === 'light' ? '🌙 Oscuro' : '☀️ Claro';
-  localStorage.setItem(THEME_STORAGE_KEY, t);
+  saveJSON(THEME_STORAGE_KEY, t);
 }
 
 function toggleTheme() {
@@ -133,6 +205,7 @@ function clearLines() {
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
     updateHUD();
   }
+  return cleared;
 }
 
 function ghostY() {
@@ -180,19 +253,11 @@ function updateHUD() {
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
-  if (!colorIndex) return;
-  const color = COLORS[colorIndex];
-  context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
-  context.globalAlpha = 1;
+  activeSkin.drawBlock(context, x, y, colorIndex, size, alpha);
 }
 
 function drawGrid() {
-  ctx.strokeStyle = GRID_COLORS[theme];
+  ctx.strokeStyle = activeSkin.gridColor[theme];
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -244,23 +309,26 @@ function drawNext() {
 function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
-  overlayTitle.textContent = 'GAME OVER';
-  overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
-  overlay.classList.remove('hidden');
+  gameoverScoreEl.textContent = `Puntuación: ${score.toLocaleString()}`;
+  showScreen('gameover');
 }
 
 function togglePause() {
-  if (gameOver) return;
+  if (!started || gameOver) return;
   paused = !paused;
   if (!paused) {
+    hideScreens();
     lastTime = performance.now();
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
-    overlayTitle.textContent = 'PAUSA';
-    overlayScore.textContent = '';
-    overlay.classList.remove('hidden');
+    showScreen('pause');
   }
+}
+
+// True si el juego debe aceptar teclas de movimiento/rotación/caída ahora mismo.
+function gameInputEnabled() {
+  return started && !paused && !gameOver && !menuOpen;
 }
 
 function loop(ts) {
@@ -280,27 +348,43 @@ function loop(ts) {
   animId = requestAnimationFrame(loop);
 }
 
+// Resetea todo el estado de una partida nueva. No arranca el bucle: eso lo hace startGame().
 function init() {
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  level = startLevel;
+  combo = 0;
+  maxCombo = 0;
+  maxLines = 0;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  menuOpen = false;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
   dropAccum = 0;
-  lastTime = performance.now();
   next = randomPiece();
   spawn();
   updateHUD();
-  overlay.classList.add('hidden');
+}
+
+// Punto de entrada para "Jugar" / "Reiniciar": resetea el estado y arranca el bucle.
+function startGame() {
+  init();
+  started = true;
+  hideScreens();
+  lastTime = performance.now();
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
-  if (paused || gameOver) return;
+  // Mientras el foco esté en un campo de texto/selector (p.ej. el nombre en la tabla
+  // de records o el selector de nivel), no interceptamos ninguna tecla del juego.
+  const active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')) return;
+
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (!gameInputEnabled()) return;
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;
@@ -323,8 +407,9 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
-restartBtn.addEventListener('click', init);
+playBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', startGame);
 themeToggleBtn.addEventListener('click', toggleTheme);
 
-applyTheme(localStorage.getItem(THEME_STORAGE_KEY) || 'dark');
-init();
+applyTheme(loadJSON(THEME_STORAGE_KEY, 'dark'));
+showScreen('start');
