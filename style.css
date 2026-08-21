@@ -130,6 +130,31 @@ body {
   color: var(--restart-color);
 }
 
+/* ---- Selector de skin ---- */
+.skin-select-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+#skin-select {
+  background: var(--kbd-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+#skin-select:hover {
+  background: var(--restart-bg);
+  color: var(--restart-color);
+}
+
 /* ---- Controles ---- */
 .controls ul {
   list-style: none;
